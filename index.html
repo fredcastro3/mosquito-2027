@@ -304,7 +304,7 @@
             </div>
 
             <form id="formPaisFilhos" class="mt-6 space-y-4 flex-1 flex flex-col" novalidate>
-              <input type="text" name="site" class="armadilha" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" />
+              <input type="text" name="mq_confirma_hp" class="armadilha" tabindex="-1" autocomplete="new-password" data-lpignore="true" data-1p-ignore aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" />
               <div>
                 <label for="pfNome" class="block text-sm font-semibold mb-1.5">Nome do responsável</label>
                 <input id="pfNome" type="text" class="campo" placeholder="Seu nome completo" autocomplete="name" />
@@ -377,7 +377,7 @@
             </div>
 
             <form id="formBandeiras" class="mt-6 space-y-4 flex-1 flex flex-col" novalidate>
-              <input type="text" name="site" class="armadilha" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" />
+              <input type="text" name="mq_confirma_hp" class="armadilha" tabindex="-1" autocomplete="new-password" data-lpignore="true" data-1p-ignore aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" />
               <div>
                 <label for="bdNome" class="block text-sm font-semibold mb-1.5">Nome completo</label>
                 <input id="bdNome" type="text" class="campo" placeholder="Seu nome completo" autocomplete="name" />
@@ -489,7 +489,7 @@
           </div>
 
           <form id="formAbada" class="mt-7 space-y-4" novalidate>
-            <input type="text" name="site" class="armadilha" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" />
+            <input type="text" name="mq_confirma_hp" class="armadilha" tabindex="-1" autocomplete="new-password" data-lpignore="true" data-1p-ignore aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" />
             <div>
               <label for="abNome" class="block text-sm font-semibold mb-1.5">Nome completo</label>
               <input id="abNome" type="text" class="campo" placeholder="Seu nome completo" autocomplete="name" />
@@ -718,7 +718,7 @@
       aviso.classList.remove('ativa');
 
       const armadilha = form.querySelector('.armadilha');
-      if (armadilha && armadilha.value) dados.site = armadilha.value;
+      if (armadilha && armadilha.value) dados.hp = armadilha.value;
 
       btn.disabled = true;
       btn.textContent = 'Enviando…';

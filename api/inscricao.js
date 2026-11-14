@@ -8,8 +8,13 @@ export default async function handler(req, res) {
   try {
     const b = lerCorpo(req);
 
-    // Campo "armadilha" para robôs: humanos não preenchem
-    if (b.site) return res.status(200).json({ ok: true });
+    // Campo "armadilha" para robôs: humanos não preenchem.
+    // (Antes se chamava "site" e o preenchimento automático do navegador às vezes
+    //  enchia o campo, fazendo cadastros reais serem descartados em silêncio.)
+    if (b.hp) {
+      console.warn('Cadastro descartado pela armadilha anti-robô:', JSON.stringify({ nome: b.nome, tipo: b.tipo }));
+      return res.status(200).json({ ok: true });
+    }
 
     // Limite simples: no máximo 20 envios a cada 10 minutos por IP
     const chaveLimite = 'mosquito2027:limite:' + ipDe(req);
