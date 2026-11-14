@@ -240,7 +240,7 @@
 
           <div class="sm:col-span-2" data-so="paisFilhos">
             <div class="flex items-center justify-between">
-              <p class="rotulo-campo !mb-0">Crianças *</p>
+              <p class="rotulo-campo !mb-0">Crianças <span class="font-normal text-tinta/50">(deixe sem crianças se o adulto não for o responsável)</span></p>
               <button type="button" id="btnAddCrianca" class="text-sm font-bold text-laranja hover:underline">+ Adicionar criança</button>
             </div>
             <div id="fCriancas" class="mt-2 space-y-2"></div>
@@ -470,7 +470,7 @@
         let base;
         if (abaAtual === 'paisFilhos') {
           const kids = (r.criancas || []).map((c) => `<li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-semibold">${esc(c.nome)}</span><span class="text-tinta/50">• ${esc(c.idade)} anos</span>${tamCrianca(c.tamanho)}</li>`).join('');
-          base = [dataCel, td(celulaNome(r)), td(celulaWhats(r)), td(tam(r.tamanho)), td(`<ul class="space-y-1.5 min-w-[280px]">${kids}</ul>`), td(`<span class="titulo text-lg">${qtd(r)}</span>`), td(kit(r))];
+          base = [dataCel, td(celulaNome(r)), td(celulaWhats(r)), td(tam(r.tamanho)), td(kids ? `<ul class="space-y-1.5 min-w-[280px]">${kids}</ul>` : '<span class="text-tinta/50 italic">Sem crianças (adulto)</span>'), td(`<span class="titulo text-lg">${qtd(r)}</span>`), td(kit(r))];
         } else if (abaAtual === 'bandeiras') {
           base = [dataCel, td(celulaNome(r)), td(celulaWhats(r)), td(tam(r.tamanho)), td(`<span class="titulo text-lg">${qtd(r)}</span>`), td(kit(r))];
         } else if (abaAtual === 'destaque') {
@@ -754,7 +754,6 @@
       if (dig && (dig < 10 || dig > 11)) return falha('WhatsApp inválido: use DDD + número (ou deixe em branco).');
       if (t === 'destaque' && (dados.posicao || '').length < 2) return falha('Escolha a posição de destaque.');
       if (t === 'bateria' && (dados.instrumento || '').length < 2) return falha('Escolha o instrumento.');
-      if (t === 'paisFilhos' && !dados.criancas.length) return falha('Adicione pelo menos uma criança.');
 
       const btn = $('#btnSalvar'); btn.disabled = true;
       try {
