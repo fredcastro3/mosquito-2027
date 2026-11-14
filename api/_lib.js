@@ -138,7 +138,7 @@ export function normalizar(b, { admin = false } = {}) {
       idade: Math.max(0, Math.min(17, parseInt(c?.idade, 10) || 0)),
       tamanho: TAMANHOS_CRIANCA.includes(c?.tamanho) ? c.tamanho : (admin ? '' : 'Infantil')
     })).filter((c) => c.nome.length >= 2);
-    if (!reg.criancas.length) falha('Informe ao menos uma criança.');
+    // 0 crianças é permitido: adulto inscrito sem ser responsável (ex.: casal, só um cadastra as crianças)
     reg.quantidade = 1 + reg.criancas.length;
   }
   if (tipo === 'abada') reg.quantidade = Math.max(1, Math.min(admin ? 200 : 20, parseInt(b.quantidade, 10) || 1));
@@ -180,6 +180,7 @@ export function montarAviso(r) {
     linhas.push('', '🧒 *Crianças:*');
     r.criancas.forEach((c) => linhas.push(`   • ${c.nome} – ${c.idade} ano(s)${c.tamanho ? ' – abadá ' + c.tamanho : ''}`));
   }
+  if (r.tipo === 'paisFilhos' && !r.criancas?.length) linhas.push('🧒 *Crianças:* nenhuma (adulto sem crianças sob responsabilidade)');
   linhas.push('', `🔢 *Abadás:* ${r.quantidade || 1}`);
   if (r.valorKit) linhas.push(`🎁 *Kit:* ${r.valorKit}`);
   linhas.push('⏳ *Pagamento:* pendente');
