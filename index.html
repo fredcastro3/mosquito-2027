@@ -845,6 +845,8 @@
       e.preventDefault();
       const form = e.currentTarget;
       const nome = $('#pfNome'), tel = $('#pfTelefone'), tam = $('#pfTamanho');
+      // Campo vazio = 0 crianças (adulto inscrito sem crianças sob responsabilidade)
+      if (inputQtd.value.trim() === '') { inputQtd.value = '0'; renderizarCriancas(); }
       const qtd = parseInt(inputQtd.value, 10);
 
       let ok = validar.nome(nome);
