@@ -223,12 +223,12 @@
             <select id="fTamanho" class="campo"></select>
           </div>
 
-          <div data-so="abada">
-            <label class="rotulo-campo" for="fQtd">Quantidade *</label>
+          <div data-so="abada bateria">
+            <label class="rotulo-campo" for="fQtd">Quantidade de abadás *</label>
             <input id="fQtd" type="number" min="1" max="200" value="1" class="campo" />
           </div>
 
-          <!-- Abadá avulso com quantidade > 1: tamanho de cada abadá -->
+          <!-- Abadá avulso / Bateria com quantidade > 1: tamanho de cada abadá -->
           <div class="sm:col-span-2 hidden rounded-xl bg-pele border-2 border-laranja/25 p-3" id="boxTamanhosExtra">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
               <p class="rotulo-campo !mb-0">Tamanho de cada abadá</p>
@@ -450,7 +450,7 @@
       bandeiras:  ['Data', 'Nome', 'WhatsApp', 'Abadá', 'Abadás', 'Kit', 'Pagamento', ''],
       caminhoAguas: ['Data', 'Tamanhos', 'Total de abadás', 'Observação', 'Pagamento', ''],
       destaque:   ['Data', 'Nome', 'Posição de destaque', 'WhatsApp', 'Abadá', 'Kit', 'Pagamento', ''],
-      bateria:    ['Data', 'Nome', 'Instrumento', 'WhatsApp', 'Abadá', 'Kit', 'Pagamento', ''],
+      bateria:    ['Data', 'Nome', 'Instrumento', 'WhatsApp', 'Tamanhos', 'Abadás', 'Kit', 'Pagamento', ''],
       abada:      ['Data', 'Nome', 'WhatsApp', 'Tamanhos', 'Quantidade', 'Valor', 'Pagamento', '']
     };
 
@@ -490,6 +490,11 @@
       return `<span class="inline-block whitespace-nowrap font-bold bg-pele rounded-md px-2 py-0.5">Abadá adulto ${esc(t)}</span>`;
     };
 
+    // Tamanhos de quem pode ter mais de um abadá (avulso / bateria): "M × 2  G × 1"
+    const celulaTamanhos = (r) => qtd(r) > 1
+      ? `<div class="flex flex-wrap gap-x-3 gap-y-1.5 min-w-[140px]">${resumoTamanhos(r).map(({ t, n }) => `<span class="whitespace-nowrap">${tam(t === 'sem tamanho' ? '' : t)} <span class="text-tinta/60">× ${n}</span></span>`).join('')}</div>`
+      : tam(r.tamanho);
+
     function renderizarTabela() {
       $('#thead').innerHTML = '<tr>' + COLUNAS[abaAtual].map((c) => `<th class="text-left font-bold text-xs uppercase tracking-wide px-4 py-3 whitespace-nowrap">${c}</th>`).join('') + '</tr>';
       const lista = filtrados();
@@ -511,12 +516,9 @@
         } else if (abaAtual === 'destaque') {
           base = [dataCel, td(celulaNome(r)), destaqueCel(r.posicao), td(celulaWhats(r)), td(tam(r.tamanho)), td(kit(r))];
         } else if (abaAtual === 'bateria') {
-          base = [dataCel, td(celulaNome(r)), destaqueCel(r.instrumento), td(celulaWhats(r)), td(tam(r.tamanho)), td(kit(r))];
+          base = [dataCel, td(celulaNome(r)), destaqueCel(r.instrumento), td(celulaWhats(r)), td(celulaTamanhos(r)), td(`<span class="titulo text-lg">${qtd(r)}</span>`), td(kit(r))];
         } else {
-          const tams = qtd(r) > 1
-            ? `<div class="flex flex-wrap gap-x-3 gap-y-1.5 min-w-[140px]">${resumoTamanhos(r).map(({ t, n }) => `<span class="whitespace-nowrap">${tam(t === 'sem tamanho' ? '' : t)} <span class="text-tinta/60">× ${n}</span></span>`).join('')}</div>`
-            : tam(r.tamanho);
-          base = [dataCel, td(celulaNome(r)), td(celulaWhats(r)), td(tams), td(`<span class="titulo text-lg">${qtd(r)}</span>`), td(kit(r))];
+          base = [dataCel, td(celulaNome(r)), td(celulaWhats(r)), td(celulaTamanhos(r)), td(`<span class="titulo text-lg">${qtd(r)}</span>`), td(kit(r))];
         }
         base.push(td(celulaStatus(r)), td(celulaAcoes(r), 'text-right'));
         return `<tr>${base.join('')}</tr>`;
@@ -605,9 +607,13 @@
         return [['Data', 'Tamanho', 'Quantidade', 'Total do cadastro', 'Pagamento', 'Observação'], ...linhas,
           [], ['TOTAL DA ALA', '', soma(lista)]];
       }
-      const extra = tipo === 'destaque' ? 'Posição de destaque' : tipo === 'bateria' ? 'Instrumento' : null;
+      if (tipo === 'bateria') {
+        return [['Data', 'Nome', 'Instrumento', 'WhatsApp', 'Tamanhos', 'Abadás', 'Valor do kit', 'Pagamento', 'Origem', 'Observação'],
+          ...lista.map((r) => [dataCompleta(r.criadoEm), r.nome, r.instrumento, r.whatsapp, qtd(r) > 1 ? resumoTxt(r) : r.tamanho, qtd(r), r.valorKit || '', statusTxt(r), origemTxt(r), r.obs || ''])];
+      }
+      const extra = tipo === 'destaque' ? 'Posição de destaque' : null;
       return [['Data', 'Nome', ...(extra ? [extra] : []), 'WhatsApp', 'Abadá', 'Valor do kit', 'Pagamento', 'Origem', 'Observação'],
-        ...lista.map((r) => [dataCompleta(r.criadoEm), r.nome, ...(extra ? [tipo === 'destaque' ? r.posicao : r.instrumento] : []), r.whatsapp, r.tamanho, r.valorKit, statusTxt(r), origemTxt(r), r.obs || ''])];
+        ...lista.map((r) => [dataCompleta(r.criadoEm), r.nome, ...(extra ? [r.posicao] : []), r.whatsapp, r.tamanho, r.valorKit, statusTxt(r), origemTxt(r), r.obs || ''])];
     }
 
     function linhasResumo() {
@@ -678,7 +684,7 @@
 
     function ajustarCamposSetor() {
       const t = $('#fTipo').value;
-      document.querySelectorAll('#formCadastro [data-so]').forEach((el) => el.classList.toggle('hidden', el.dataset.so !== t));
+      document.querySelectorAll('#formCadastro [data-so]').forEach((el) => el.classList.toggle('hidden', !el.dataset.so.split(' ').includes(t)));
       document.querySelectorAll('#formCadastro [data-nao]').forEach((el) => el.classList.toggle('hidden', el.dataset.nao.split(' ').includes(t)));
       $('#rotuloNome').textContent = t === 'paisFilhos' ? 'Nome do responsável' : 'Nome completo';
       $('#rotuloTamanho').textContent = t === 'paisFilhos' ? 'Abadá do responsável' : 'Tamanho do abadá';
@@ -693,7 +699,7 @@
     // O seletor "Tamanho do abadá" vale para o abadá 1; os demais aparecem aqui.
     function renderizarTamanhosExtra(valores) {
       const t = $('#fTipo').value;
-      const q = t === 'abada' ? Math.min(Math.max(parseInt($('#fQtd').value, 10) || 1, 1), 200) : 1;
+      const q = ['abada', 'bateria'].includes(t) ? Math.min(Math.max(parseInt($('#fQtd').value, 10) || 1, 1), 200) : 1;
       const caixa = $('#fTamanhosExtra');
       if (valores) caixa.innerHTML = '';
       const itens = caixa.children;
@@ -819,7 +825,7 @@
       atualizarTotalGrade();
       $('#fTamanhosExtra').innerHTML = '';
       $('#fTipo').value = reg ? reg.tipo : abaAtual;
-      if (reg?.tipo === 'abada') {
+      if (['abada', 'bateria'].includes(reg?.tipo)) {
         const lista = reg.tamanhos?.length ? reg.tamanhos : Array(reg.quantidade || 1).fill(reg.tamanho || '');
         $('#fTamanho').value = lista[0] || '';
         renderizarTamanhosExtra(lista);
@@ -858,7 +864,7 @@
       };
       if (t === 'destaque') dados.posicao = valorOuOutro($('#fPosicao'), $('#fPosicaoOutra'));
       if (t === 'bateria') dados.instrumento = valorOuOutro($('#fInstrumento'), $('#fInstrumentoOutro'));
-      if (t === 'abada') dados.tamanhos = tamanhosDoForm().slice(0, dados.quantidade);
+      if (['abada', 'bateria'].includes(t)) dados.tamanhos = tamanhosDoForm().slice(0, dados.quantidade);
       if (t === 'caminhoAguas') {
         dados.grade = gradeDoForm();
         dados.nome = '';

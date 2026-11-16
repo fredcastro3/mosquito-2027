@@ -18,7 +18,9 @@ export const TAMANHOS_CRIANCA = [...TAMANHOS, ...TAMANHOS_INFANTIS];
 // Setores que o SITE pode enviar
 export const TIPOS_PUBLICOS = ['paisFilhos', 'bandeiras', 'abada'];
 // Todos os setores (o painel pode cadastrar em qualquer um)
-export const TIPOS = ['paisFilhos', 'bandeiras', 'destaque', 'bateria', 'abada'];
+// caminhoAguas = 3ª ala, patrocinada pela Pousada Caminho das Águas (só o painel cadastra)
+export const TIPOS = ['paisFilhos', 'bandeiras', 'caminhoAguas', 'destaque', 'bateria', 'abada'];
+export const NOME_CAMINHO_AGUAS = 'Ala Caminho das Águas';
 
 // ---------- Banco de dados (Upstash Redis via REST, sem dependências) ----------
 // Aceita qualquer prefixo escolhido ao conectar o banco no Vercel (KV_, STORAGE_, UPSTASH_REDIS_ …)
@@ -119,16 +121,17 @@ export function normalizar(b, { admin = false } = {}) {
   const permitidos = admin ? TIPOS : TIPOS_PUBLICOS;
   const tipo = permitidos.includes(b.tipo) ? b.tipo : falha('Setor inválido.');
 
-  const nome = texto(b.nome, 100);
+  // Ala patrocinada: o cadastro é só tamanho + quantidade (nome é opcional)
+  const nome = texto(b.nome, 100) || (tipo === 'caminhoAguas' ? NOME_CAMINHO_AGUAS : '');
   if (nome.length < 3) falha('Informe o nome completo.');
 
-  const whatsapp = texto(b.whatsapp, 20).replace(/[^\d()\s-]/g, '');
+  const whatsapp = tipo === 'caminhoAguas' ? '' : texto(b.whatsapp, 20).replace(/[^\d()\s-]/g, '');
   const digitos = whatsapp.replace(/\D/g, '').length;
   // No painel o WhatsApp é opcional; se preenchido, precisa ser válido
   if ((!admin || digitos > 0) && (digitos < 10 || digitos > 11)) falha('WhatsApp inválido (use DDD + número).');
 
-  const tamanho = TAMANHOS.includes(b.tamanho) ? b.tamanho : '';
-  if (!admin && !tamanho) falha('Selecione o tamanho do abadá.');
+  let tamanho = TAMANHOS.includes(b.tamanho) ? b.tamanho : '';
+  if (!admin && !tamanho && !(Array.isArray(b.tamanhos) && b.tamanhos.length)) falha('Selecione o tamanho do abadá.');
 
   const reg = { tipo, nome, whatsapp, tamanho, quantidade: 1, criancas: [], valorKit: texto(b.valorKit, 20) };
 
@@ -141,7 +144,29 @@ export function normalizar(b, { admin = false } = {}) {
     // 0 crianças é permitido: adulto inscrito sem ser responsável (ex.: casal, só um cadastra as crianças)
     reg.quantidade = 1 + reg.criancas.length;
   }
-  if (tipo === 'abada') reg.quantidade = Math.max(1, Math.min(admin ? 200 : 20, parseInt(b.quantidade, 10) || 1));
+  // Abadá avulso e Bateria: vários abadás por pessoa, cada um com seu tamanho
+  if (tipo === 'abada' || tipo === 'bateria') {
+    reg.quantidade = Math.max(1, Math.min(admin ? 200 : 20, parseInt(b.quantidade, 10) || 1));
+    // Tamanho de cada abadá do pedido (um por unidade)
+    const lista = Array.isArray(b.tamanhos) ? b.tamanhos : [];
+    reg.tamanhos = Array.from({ length: reg.quantidade }, (_, i) => {
+      const t = lista[i] ?? (i === 0 ? tamanho : '');
+      return TAMANHOS.includes(t) ? t : '';
+    });
+    if (!admin && reg.tamanhos.some((t) => !t)) falha('Selecione o tamanho de cada abadá.');
+    reg.tamanho = reg.tamanhos.find(Boolean) || '';
+  }
+  if (tipo === 'caminhoAguas') {
+    // Grade de tamanhos: [{ tamanho: 'M', quantidade: 10 }, …]
+    reg.grade = (Array.isArray(b.grade) ? b.grade : []).slice(0, 30).map((g) => ({
+      tamanho: TAMANHOS.includes(g?.tamanho) ? g.tamanho : '',
+      quantidade: Math.max(0, Math.min(500, parseInt(g?.quantidade, 10) || 0))
+    })).filter((g) => g.quantidade > 0);
+    if (!reg.grade.length) falha('Informe ao menos um tamanho com quantidade.');
+    reg.quantidade = reg.grade.reduce((s, g) => s + g.quantidade, 0);
+    reg.tamanho = reg.grade[0].tamanho;
+    reg.valorKit = '';
+  }
   if (tipo === 'destaque') {
     reg.posicao = texto(b.posicao, 80);
     if (reg.posicao.length < 2) falha('Informe a posição de destaque.');
@@ -165,7 +190,7 @@ export function normalizar(b, { admin = false } = {}) {
 const AVISO_NUMERO_PADRAO = '5514997833913'; // (14) 99783-3913 — número de teste
 
 const NOMES_SETOR = {
-  paisFilhos: '🎭 Ala Pais e Filhos', bandeiras: '🚩 Ala das Bandeiras',
+  paisFilhos: '🎭 Ala Pais e Filhos', bandeiras: '🚩 Ala das Bandeiras', caminhoAguas: '💧 Ala Caminho das Águas',
   destaque: '⭐ Destaques', bateria: '🥁 Bateria', abada: '👕 Abadá avulso'
 };
 
@@ -175,7 +200,11 @@ export function montarAviso(r) {
   if (r.whatsapp) linhas.push(`📱 *WhatsApp:* ${r.whatsapp}`);
   if (r.posicao) linhas.push(`⭐ *Posição:* ${r.posicao}`);
   if (r.instrumento) linhas.push(`🥁 *Instrumento:* ${r.instrumento}`);
-  if (r.tamanho) linhas.push(`📏 *Abadá${r.tipo === 'paisFilhos' ? ' do responsável' : ''}:* ${r.tamanho}`);
+  if ((r.tipo === 'abada' || r.tipo === 'bateria') && r.tamanhos?.length > 1) {
+    const cont = {};
+    r.tamanhos.forEach((t) => { const k = t || 'sem tamanho'; cont[k] = (cont[k] || 0) + 1; });
+    linhas.push(`📏 *Tamanhos:* ${Object.entries(cont).map(([t, n]) => `${n}× ${t}`).join(', ')}`);
+  } else if (r.tamanho) linhas.push(`📏 *Abadá${r.tipo === 'paisFilhos' ? ' do responsável' : ''}:* ${r.tamanho}`);
   if (r.tipo === 'paisFilhos' && r.criancas?.length) {
     linhas.push('', '🧒 *Crianças:*');
     r.criancas.forEach((c) => linhas.push(`   • ${c.nome} – ${c.idade} ano(s)${c.tamanho ? ' – abadá ' + c.tamanho : ''}`));
