@@ -502,7 +502,7 @@
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label for="abTamanho" class="block text-sm font-semibold mb-1.5">Tamanho do abadá</label>
+                <label for="abTamanho" class="block text-sm font-semibold mb-1.5"><span id="abRotuloTamanho">Tamanho do abadá</span></label>
                 <select id="abTamanho" class="campo" data-tamanhos></select>
                 <p class="msg-erro">Selecione um tamanho.</p>
               </div>
@@ -512,7 +512,12 @@
                 <p class="msg-erro">De 1 a 20 abadás.</p>
               </div>
             </div>
-            <p class="text-xs text-tinta/60">Para mais de um tamanho, envie um pedido para cada tamanho.</p>
+            <!-- Aparece quando a quantidade é maior que 1: tamanho de cada abadá -->
+            <div id="abTamanhosExtra" class="hidden rounded-2xl border-2 border-laranja/30 bg-pele p-4">
+              <p class="text-sm font-semibold">Tamanho de cada abadá</p>
+              <p class="text-xs text-tinta/60 mb-3">Escolha o tamanho de cada um (podem ser diferentes).</p>
+              <div id="abListaTamanhos" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+            </div>
             <button type="submit" class="btn-enviar btn-laranja w-full font-bold px-6 py-4 rounded-2xl flex items-center justify-center gap-2">
               Reservar meu Abadá
             </button>
@@ -752,6 +757,7 @@
       caixa.querySelector('button').addEventListener('click', () => {
         form.reset();
         if (form.id === 'formPaisFilhos') renderizarCriancas();
+        if (form.id === 'formAbada') renderizarTamanhosAbada();
         caixa.remove();
         form.classList.remove('hidden');
         form.querySelector('.campo').focus();
@@ -903,24 +909,57 @@
       const n = parseFloat(String(unitario).replace(/[^\d,]/g, '').replace(',', '.')) || 0;
       return (n * (quantidade || 1)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
+    // Quantidade > 1: um seletor de tamanho para cada abadá (o 1º é o seletor principal)
+    function renderizarTamanhosAbada() {
+      const q = Math.min(Math.max(parseInt($('#abQtd').value, 10) || 1, 1), 20);
+      const lista = $('#abListaTamanhos');
+      const blocos = lista.children;
+      for (let i = blocos.length + 2; i <= q; i++) {
+        const anterior = blocos.length ? blocos[blocos.length - 1].querySelector('select').value : $('#abTamanho').value;
+        const div = document.createElement('div');
+        div.innerHTML = `
+          <label class="block text-xs font-semibold mb-1">Abadá ${i}</label>
+          <select class="campo ab-tam-extra !px-2">${'<option value="">Selecione</option>' + TAMANHOS.map((t) => `<option>${t}</option>`).join('')}</select>
+          <p class="msg-erro">Tamanho?</p>`;
+        const sel = div.querySelector('select');
+        sel.value = anterior; // já vem com o tamanho do anterior, para agilizar
+        sel.addEventListener('change', () => sel.classList.contains('erro') && marcarErro(sel, false));
+        lista.appendChild(div);
+      }
+      for (let i = blocos.length - 1; i >= Math.max(q - 1, 0); i--) blocos[i].remove();
+      $('#abTamanhosExtra').classList.toggle('hidden', q <= 1);
+      $('#abRotuloTamanho').textContent = q > 1 ? 'Tamanho do abadá 1' : 'Tamanho do abadá';
+    }
+    $('#abQtd').addEventListener('input', renderizarTamanhosAbada);
+
     $('#formAbada').addEventListener('submit', (e) => {
       e.preventDefault();
       const form = e.currentTarget;
       const nome = $('#abNome'), tel = $('#abTelefone'), tam = $('#abTamanho'), qtdAb = $('#abQtd');
       const quantidade = parseInt(qtdAb.value, 10);
+      renderizarTamanhosAbada();
+      const extras = [...document.querySelectorAll('#abListaTamanhos .ab-tam-extra')];
 
       let ok = validar.nome(nome);
       ok = validar.telefone(tel) && ok;
       ok = validar.obrigatorio(tam) && ok;
       ok = marcarErro(qtdAb, !(quantidade >= 1 && quantidade <= 20)) && ok;
+      extras.forEach((s) => { ok = validar.obrigatorio(s) && ok; });
       if (!ok) return focarPrimeiroErro(form);
 
+      const tamanhos = [tam.value, ...extras.map((s) => s.value)].slice(0, quantidade);
+      const cont = {};
+      tamanhos.forEach((t) => { cont[t] = (cont[t] || 0) + 1; });
+      const resumo = Object.entries(cont).map(([t, n]) => `${n}× <strong>${esc(t)}</strong>`).join(', ');
+
       enviarInscricao({
-        tipo: 'abada', nome: nome.value.trim(), whatsapp: tel.value, tamanho: tam.value, quantidade,
+        tipo: 'abada', nome: nome.value.trim(), whatsapp: tel.value, tamanho: tam.value, tamanhos, quantidade,
         valorKit: valorTotal(VALORES_KIT.avulso, quantidade)
       }, form, {
         titulo: 'Pedido recebido!',
-        texto: `Anotamos ${quantidade} abadá(s) tamanho <strong>${esc(tam.value)}</strong>. Em breve nossa equipe chama você no WhatsApp ${esc(tel.value)} para combinar o pagamento e a retirada.`
+        texto: quantidade > 1
+          ? `Anotamos ${quantidade} abadás: ${resumo}. Em breve nossa equipe chama você no WhatsApp ${esc(tel.value)} para combinar o pagamento e a retirada.`
+          : `Anotamos 1 abadá tamanho <strong>${esc(tam.value)}</strong>. Em breve nossa equipe chama você no WhatsApp ${esc(tel.value)} para combinar o pagamento e a retirada.`
       });
     });
 

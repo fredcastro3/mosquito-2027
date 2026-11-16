@@ -1,0 +1,237 @@
+// =====================================================
+//  Funções compartilhadas da API (arquivos com "_" não viram rota no Vercel)
+// =====================================================
+import crypto from 'node:crypto';
+
+// ---------- Login do painel ----------
+// Usuário: Mosquito
+// A senha NÃO fica escrita aqui, só o "hash" dela (SHA-256).
+// Para trocar a senha sem mexer no código, crie no Vercel a variável ADMIN_SENHA.
+const USUARIO_PADRAO = 'Mosquito';
+const SENHA_HASH_PADRAO = '319865e076987801d98fbc9ed9a8bc7f51057bd0e65c55f918e154378203c34b';
+
+export const TAMANHOS = ['PP', 'P', 'M', 'G', 'GG', 'XGG', 'G1', 'G2', 'G3', 'Infantil'];
+// Abadá das crianças (Ala Pais e Filhos): numeração Infantil 1 a 16, tamanhos adultos
+// para crianças maiores e "Infantil" (sem número) para cadastros antigos
+export const TAMANHOS_INFANTIS = Array.from({ length: 16 }, (_, i) => 'Infantil ' + (i + 1));
+export const TAMANHOS_CRIANCA = [...TAMANHOS, ...TAMANHOS_INFANTIS];
+// Setores que o SITE pode enviar
+export const TIPOS_PUBLICOS = ['paisFilhos', 'bandeiras', 'abada'];
+// Todos os setores (o painel pode cadastrar em qualquer um)
+// caminhoAguas = 3ª ala, patrocinada pela Pousada Caminho das Águas (só o painel cadastra)
+export const TIPOS = ['paisFilhos', 'bandeiras', 'caminhoAguas', 'destaque', 'bateria', 'abada'];
+export const NOME_CAMINHO_AGUAS = 'Ala Caminho das Águas';
+
+// ---------- Banco de dados (Upstash Redis via REST, sem dependências) ----------
+// Aceita qualquer prefixo escolhido ao conectar o banco no Vercel (KV_, STORAGE_, UPSTASH_REDIS_ …)
+function acharVariavel(sufixo) {
+  const preferidas = ['KV' + sufixo, 'STORAGE' + sufixo, 'UPSTASH_REDIS' + sufixo];
+  for (const n of preferidas) if (process.env[n]) return process.env[n];
+  const outra = Object.keys(process.env).find((n) => n.endsWith(sufixo) && !n.includes('READ_ONLY'));
+  return outra ? process.env[outra] : '';
+}
+
+function credenciaisRedis() {
+  const url = acharVariavel('_REST_API_URL') || acharVariavel('_REST_URL');
+  const token = acharVariavel('_REST_API_TOKEN') || acharVariavel('_REST_TOKEN');
+  if (!url || !token) throw new Error('BANCO_NAO_CONFIGURADO');
+  return { url: url.replace(/\/$/, ''), token };
+}
+
+export async function redis(...comando) {
+  const { url, token } = credenciaisRedis();
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(comando)
+  });
+  const dados = await r.json().catch(() => ({}));
+  if (!r.ok || dados.error) throw new Error('ERRO_BANCO: ' + (dados.error || r.status));
+  return dados.result;
+}
+
+export const CHAVE = 'mosquito2027:inscricoes';
+
+// ---------- Sessão (token assinado) ----------
+function segredoSessao() {
+  const base = process.env.SESSION_SECRET || acharVariavel('_REST_API_TOKEN') || acharVariavel('_REST_TOKEN') || '';
+  if (!base) throw new Error('BANCO_NAO_CONFIGURADO');
+  return crypto.createHash('sha256').update('sessao-mosquito:' + base).digest();
+}
+
+const sha256 = (t) => crypto.createHash('sha256').update(String(t)).digest('hex');
+const iguais = (a, b) => {
+  const A = Buffer.from(String(a)), B = Buffer.from(String(b));
+  return A.length === B.length && crypto.timingSafeEqual(A, B);
+};
+
+export function conferirLogin(usuario, senha) {
+  const usuarioOk = String(usuario || '').trim().toLowerCase() === (process.env.ADMIN_USUARIO || USUARIO_PADRAO).toLowerCase();
+  const hashEsperado = process.env.ADMIN_SENHA ? sha256(process.env.ADMIN_SENHA) : SENHA_HASH_PADRAO;
+  const senhaOk = iguais(sha256(senha || ''), hashEsperado);
+  return usuarioOk && senhaOk;
+}
+
+export function criarToken(horas = 12) {
+  const exp = Date.now() + horas * 3600 * 1000;
+  const corpo = Buffer.from(JSON.stringify({ u: 'admin', exp })).toString('base64url');
+  const assinatura = crypto.createHmac('sha256', segredoSessao()).update(corpo).digest('base64url');
+  return `${corpo}.${assinatura}`;
+}
+
+export function tokenValido(req) {
+  try {
+    const cab = req.headers.authorization || '';
+    const token = cab.startsWith('Bearer ') ? cab.slice(7) : '';
+    const [corpo, assinatura] = token.split('.');
+    if (!corpo || !assinatura) return false;
+    const esperada = crypto.createHmac('sha256', segredoSessao()).update(corpo).digest('base64url');
+    if (!iguais(assinatura, esperada)) return false;
+    const { exp } = JSON.parse(Buffer.from(corpo, 'base64url').toString());
+    return Date.now() < exp;
+  } catch { return false; }
+}
+
+// ---------- Utilidades ----------
+export function lerCorpo(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  try { return JSON.parse(req.body || '{}'); } catch { return {}; }
+}
+
+export const texto = (v, max = 120) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
+
+export function ipDe(req) {
+  return String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'anon').split(',')[0].trim();
+}
+
+export function erro(res, e) {
+  const msg = String(e?.message || e);
+  if (msg.startsWith('INVALIDO: ')) return res.status(400).json({ ok: false, erro: msg.slice(10) });
+  if (msg.includes('BANCO_NAO_CONFIGURADO')) {
+    return res.status(503).json({ ok: false, erro: 'Banco de dados ainda não conectado no Vercel (Storage → Upstash Redis).' });
+  }
+  console.error(e);
+  return res.status(500).json({ ok: false, erro: 'Erro interno. Tente novamente.' });
+}
+
+// ---------- Validação de um cadastro (site ou painel) ----------
+// Lança Error('INVALIDO: mensagem') quando algo está errado.
+export function normalizar(b, { admin = false } = {}) {
+  const falha = (m) => { throw new Error('INVALIDO: ' + m); };
+  const permitidos = admin ? TIPOS : TIPOS_PUBLICOS;
+  const tipo = permitidos.includes(b.tipo) ? b.tipo : falha('Setor inválido.');
+
+  // Ala patrocinada: o cadastro é só tamanho + quantidade (nome é opcional)
+  const nome = texto(b.nome, 100) || (tipo === 'caminhoAguas' ? NOME_CAMINHO_AGUAS : '');
+  if (nome.length < 3) falha('Informe o nome completo.');
+
+  const whatsapp = tipo === 'caminhoAguas' ? '' : texto(b.whatsapp, 20).replace(/[^\d()\s-]/g, '');
+  const digitos = whatsapp.replace(/\D/g, '').length;
+  // No painel o WhatsApp é opcional; se preenchido, precisa ser válido
+  if ((!admin || digitos > 0) && (digitos < 10 || digitos > 11)) falha('WhatsApp inválido (use DDD + número).');
+
+  let tamanho = TAMANHOS.includes(b.tamanho) ? b.tamanho : '';
+  if (!admin && !tamanho && !(Array.isArray(b.tamanhos) && b.tamanhos.length)) falha('Selecione o tamanho do abadá.');
+
+  const reg = { tipo, nome, whatsapp, tamanho, quantidade: 1, criancas: [], valorKit: texto(b.valorKit, 20) };
+
+  if (tipo === 'paisFilhos') {
+    reg.criancas = (Array.isArray(b.criancas) ? b.criancas : []).slice(0, 10).map((c) => ({
+      nome: texto(c?.nome, 80),
+      idade: Math.max(0, Math.min(17, parseInt(c?.idade, 10) || 0)),
+      tamanho: TAMANHOS_CRIANCA.includes(c?.tamanho) ? c.tamanho : (admin ? '' : 'Infantil')
+    })).filter((c) => c.nome.length >= 2);
+    // 0 crianças é permitido: adulto inscrito sem ser responsável (ex.: casal, só um cadastra as crianças)
+    reg.quantidade = 1 + reg.criancas.length;
+  }
+  if (tipo === 'abada') {
+    reg.quantidade = Math.max(1, Math.min(admin ? 200 : 20, parseInt(b.quantidade, 10) || 1));
+    // Tamanho de cada abadá do pedido (um por unidade)
+    const lista = Array.isArray(b.tamanhos) ? b.tamanhos : [];
+    reg.tamanhos = Array.from({ length: reg.quantidade }, (_, i) => {
+      const t = lista[i] ?? (i === 0 ? tamanho : '');
+      return TAMANHOS.includes(t) ? t : '';
+    });
+    if (!admin && reg.tamanhos.some((t) => !t)) falha('Selecione o tamanho de cada abadá.');
+    reg.tamanho = reg.tamanhos.find(Boolean) || '';
+  }
+  if (tipo === 'caminhoAguas') {
+    // Grade de tamanhos: [{ tamanho: 'M', quantidade: 10 }, …]
+    reg.grade = (Array.isArray(b.grade) ? b.grade : []).slice(0, 30).map((g) => ({
+      tamanho: TAMANHOS.includes(g?.tamanho) ? g.tamanho : '',
+      quantidade: Math.max(0, Math.min(500, parseInt(g?.quantidade, 10) || 0))
+    })).filter((g) => g.quantidade > 0);
+    if (!reg.grade.length) falha('Informe ao menos um tamanho com quantidade.');
+    reg.quantidade = reg.grade.reduce((s, g) => s + g.quantidade, 0);
+    reg.tamanho = reg.grade[0].tamanho;
+    reg.valorKit = '';
+  }
+  if (tipo === 'destaque') {
+    reg.posicao = texto(b.posicao, 80);
+    if (reg.posicao.length < 2) falha('Informe a posição de destaque.');
+  }
+  if (tipo === 'bateria') {
+    reg.instrumento = texto(b.instrumento, 60);
+    if (reg.instrumento.length < 2) falha('Informe o instrumento.');
+  }
+  if (admin) {
+    reg.status = b.status === 'pago' ? 'pago' : 'pendente';
+    reg.obs = texto(b.obs, 300);
+  }
+  return reg;
+}
+
+// ---------- Aviso no WhatsApp da organização a cada novo cadastro ----------
+// Usa o CallMeBot (grátis). Configure no Vercel → Settings → Environment Variables:
+//   CALLMEBOT_APIKEY  = chave recebida do CallMeBot (obrigatória para o aviso funcionar)
+//   AVISO_WHATSAPP    = número que recebe o aviso, só dígitos com 55 + DDD (opcional)
+//   SITE_URL          = endereço do site, para o link do painel na mensagem (opcional)
+const AVISO_NUMERO_PADRAO = '5514997833913'; // (14) 99783-3913 — número de teste
+
+const NOMES_SETOR = {
+  paisFilhos: '🎭 Ala Pais e Filhos', bandeiras: '🚩 Ala das Bandeiras', caminhoAguas: '💧 Ala Caminho das Águas',
+  destaque: '⭐ Destaques', bateria: '🥁 Bateria', abada: '👕 Abadá avulso'
+};
+
+export function montarAviso(r) {
+  const linhas = [`🔔 *NOVO CADASTRO – ${NOMES_SETOR[r.tipo] || r.tipo}*`, '_Mosquito • Caravana Cigana 2027_', ''];
+  linhas.push(`👤 *${r.tipo === 'paisFilhos' ? 'Responsável' : 'Nome'}:* ${r.nome}`);
+  if (r.whatsapp) linhas.push(`📱 *WhatsApp:* ${r.whatsapp}`);
+  if (r.posicao) linhas.push(`⭐ *Posição:* ${r.posicao}`);
+  if (r.instrumento) linhas.push(`🥁 *Instrumento:* ${r.instrumento}`);
+  if (r.tipo === 'abada' && r.tamanhos?.length > 1) {
+    const cont = {};
+    r.tamanhos.forEach((t) => { const k = t || 'sem tamanho'; cont[k] = (cont[k] || 0) + 1; });
+    linhas.push(`📏 *Tamanhos:* ${Object.entries(cont).map(([t, n]) => `${n}× ${t}`).join(', ')}`);
+  } else if (r.tamanho) linhas.push(`📏 *Abadá${r.tipo === 'paisFilhos' ? ' do responsável' : ''}:* ${r.tamanho}`);
+  if (r.tipo === 'paisFilhos' && r.criancas?.length) {
+    linhas.push('', '🧒 *Crianças:*');
+    r.criancas.forEach((c) => linhas.push(`   • ${c.nome} – ${c.idade} ano(s)${c.tamanho ? ' – abadá ' + c.tamanho : ''}`));
+  }
+  if (r.tipo === 'paisFilhos' && !r.criancas?.length) linhas.push('🧒 *Crianças:* nenhuma (adulto sem crianças sob responsabilidade)');
+  linhas.push('', `🔢 *Abadás:* ${r.quantidade || 1}`);
+  if (r.valorKit) linhas.push(`🎁 *Kit:* ${r.valorKit}`);
+  linhas.push('⏳ *Pagamento:* pendente');
+  const site = (process.env.SITE_URL || '').replace(/\/$/, '');
+  if (site) linhas.push('', `📋 Painel: ${site}/admin`);
+  return linhas.join('\n');
+}
+
+export async function avisarWhatsApp(texto) {
+  const apikey = process.env.CALLMEBOT_APIKEY;
+  const numero = String(process.env.AVISO_WHATSAPP || AVISO_NUMERO_PADRAO).replace(/\D/g, '');
+  if (!apikey) return { enviado: false, motivo: 'Falta a variável CALLMEBOT_APIKEY no Vercel.' };
+  const url = `https://api.callmebot.com/whatsapp.php?phone=${numero}&apikey=${encodeURIComponent(apikey)}&text=${encodeURIComponent(texto)}`;
+  const controle = new AbortController();
+  const tempo = setTimeout(() => controle.abort(), 7000);
+  try {
+    const r = await fetch(url, { signal: controle.signal });
+    const corpo = await r.text().catch(() => '');
+    const ok = r.ok && !/error|invalid|not\s+active/i.test(corpo.slice(0, 400));
+    return ok ? { enviado: true } : { enviado: false, motivo: 'CallMeBot respondeu: ' + corpo.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200) };
+  } catch (e) {
+    return { enviado: false, motivo: 'Não foi possível falar com o CallMeBot (' + (e.name === 'AbortError' ? 'tempo esgotado' : e.message) + ').' };
+  } finally {
+    clearTimeout(tempo);
+  }
+}

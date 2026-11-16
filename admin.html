@@ -147,6 +147,7 @@
         <div role="tablist" class="flex flex-wrap gap-3">
           <button role="tab" class="aba px-4 py-2.5 rounded-xl text-sm" data-aba="paisFilhos" aria-selected="true">Ala Pais e Filhos <span class="ml-1 opacity-80" data-cont="paisFilhos">0</span></button>
           <button role="tab" class="aba px-4 py-2.5 rounded-xl text-sm" data-aba="bandeiras" aria-selected="false">Ala das Bandeiras <span class="ml-1 opacity-80" data-cont="bandeiras">0</span></button>
+          <button role="tab" class="aba px-4 py-2.5 rounded-xl text-sm" data-aba="caminhoAguas" aria-selected="false">Ala Caminho das Águas <span class="ml-1 opacity-80" data-cont="caminhoAguas">0</span></button>
           <button role="tab" class="aba px-4 py-2.5 rounded-xl text-sm" data-aba="destaque" aria-selected="false">Destaques <span class="ml-1 opacity-80" data-cont="destaque">0</span></button>
           <button role="tab" class="aba px-4 py-2.5 rounded-xl text-sm" data-aba="bateria" aria-selected="false">Bateria <span class="ml-1 opacity-80" data-cont="bateria">0</span></button>
           <button role="tab" class="aba px-4 py-2.5 rounded-xl text-sm" data-aba="abada" aria-selected="false">Abadás avulsos (fora do kit) <span class="ml-1 opacity-80" data-cont="abada">0</span></button>
@@ -209,15 +210,15 @@
             <input id="fInstrumentoOutro" class="campo mt-2 hidden" placeholder="Qual instrumento?" maxlength="60" />
           </div>
 
-          <div class="sm:col-span-2">
+          <div class="sm:col-span-2" data-nao="caminhoAguas">
             <label class="rotulo-campo" for="fNome"><span id="rotuloNome">Nome completo</span> *</label>
             <input id="fNome" class="campo" maxlength="100" />
           </div>
-          <div>
+          <div data-nao="caminhoAguas">
             <label class="rotulo-campo" for="fWhats">WhatsApp</label>
             <input id="fWhats" class="campo" inputmode="tel" placeholder="(00) 00000-0000" maxlength="16" />
           </div>
-          <div>
+          <div data-nao="caminhoAguas">
             <label class="rotulo-campo" for="fTamanho"><span id="rotuloTamanho">Tamanho do abadá</span></label>
             <select id="fTamanho" class="campo"></select>
           </div>
@@ -226,11 +227,31 @@
             <label class="rotulo-campo" for="fQtd">Quantidade *</label>
             <input id="fQtd" type="number" min="1" max="200" value="1" class="campo" />
           </div>
-          <div>
+
+          <!-- Abadá avulso com quantidade > 1: tamanho de cada abadá -->
+          <div class="sm:col-span-2 hidden rounded-xl bg-pele border-2 border-laranja/25 p-3" id="boxTamanhosExtra">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <p class="rotulo-campo !mb-0">Tamanho de cada abadá</p>
+              <p id="resumoTamanhos" class="text-xs text-tinta/60"></p>
+            </div>
+            <div id="fTamanhosExtra" class="mt-2 grid grid-cols-3 sm:grid-cols-5 gap-2 max-h-64 overflow-y-auto pr-1"></div>
+          </div>
+
+          <!-- Ala Caminho das Águas (patrocinada): só tamanho + quantidade -->
+          <div class="sm:col-span-2" data-so="caminhoAguas">
+            <div class="flex items-center justify-between">
+              <p class="rotulo-campo !mb-0">Abadás da ala (tamanho e quantidade) *</p>
+              <button type="button" id="btnAddGrade" class="text-sm font-bold text-laranja hover:underline">+ Adicionar tamanho</button>
+            </div>
+            <div id="fGrade" class="mt-2 space-y-2"></div>
+            <p class="mt-3 text-right text-sm font-semibold">Total: <span id="totalGrade" class="titulo text-2xl text-laranja align-middle">0</span> abadá(s)</p>
+          </div>
+
+          <div data-nao="caminhoAguas">
             <label class="rotulo-campo" for="fValor"><span id="rotuloValor">Valor do kit</span></label>
             <input id="fValor" class="campo" placeholder="R$ 0,00" maxlength="20" />
           </div>
-          <div>
+          <div data-nao="caminhoAguas">
             <label class="rotulo-campo" for="fStatus">Pagamento</label>
             <select id="fStatus" class="campo">
               <option value="pendente">⏳ Pendente</option>
@@ -268,9 +289,9 @@
     const TAMANHOS_INFANTIS = Array.from({ length: 16 }, (_, i) => 'Infantil ' + (i + 1));
     /* Valor unitário do abadá avulso (mesmo do index.html) — usado para sugerir o valor no cadastro */
     const VALOR_AVULSO = 'R$ 54,90';
-    const NOMES = { paisFilhos: 'Ala Pais e Filhos', bandeiras: 'Ala das Bandeiras', destaque: 'Destaques', bateria: 'Bateria', abada: 'Abadás avulsos' };
+    const NOMES = { paisFilhos: 'Ala Pais e Filhos', bandeiras: 'Ala das Bandeiras', caminhoAguas: 'Ala Caminho das Águas', destaque: 'Destaques', bateria: 'Bateria', abada: 'Abadás avulsos' };
     const SETORES = Object.keys(NOMES);
-    const SETORES_KIT = ['paisFilhos', 'bandeiras', 'destaque', 'bateria'];
+    const SETORES_KIT = ['paisFilhos', 'bandeiras', 'caminhoAguas', 'destaque', 'bateria'];
 
     /* Posições de destaque (do projeto do desfile) — edite à vontade */
     const POSICOES = [
@@ -368,8 +389,17 @@
     // Lista de abadás "individuais" de uma inscrição (para contagem por tamanho)
     function abadasDe(r) {
       if (r.tipo === 'paisFilhos') return [r.tamanho, ...(r.criancas || []).map((c) => c.tamanho)];
+      if (Array.isArray(r.grade)) return r.grade.flatMap((g) => Array(g.quantidade || 0).fill(g.tamanho));
+      if (Array.isArray(r.tamanhos) && r.tamanhos.length) return r.tamanhos;
       return Array(r.quantidade || 1).fill(r.tamanho);
     }
+    // "2× M, 1× G" — resumo dos tamanhos de um pedido
+    function resumoTamanhos(r) {
+      const cont = {};
+      abadasDe(r).forEach((t) => { const k = t || 'sem tamanho'; cont[k] = (cont[k] || 0) + 1; });
+      return Object.entries(cont).map(([t, n]) => ({ t, n }));
+    }
+    const resumoTxt = (r) => resumoTamanhos(r).map(({ t, n }) => `${n}× ${t}`).join(', ');
     const qtd = (r) => r.tipo === 'paisFilhos' ? 1 + (r.criancas || []).length : (r.quantidade || 1);
     const soma = (lista) => lista.reduce((s, r) => s + qtd(r), 0);
 
@@ -390,7 +420,7 @@
       const de = (t) => inscricoes.filter((r) => r.tipo === t);
       const av = de('abada');
       $('#cKit').textContent = SETORES_KIT.reduce((s, t) => s + soma(de(t)), 0);
-      $('#cKitDet').textContent = `Pais e Filhos: ${soma(de('paisFilhos'))} • Bandeiras: ${soma(de('bandeiras'))} • Destaques: ${soma(de('destaque'))} • Bateria: ${soma(de('bateria'))}`;
+      $('#cKitDet').textContent = `Pais e Filhos: ${soma(de('paisFilhos'))} • Bandeiras: ${soma(de('bandeiras'))} • Caminho das Águas: ${soma(de('caminhoAguas'))} • Destaques: ${soma(de('destaque'))} • Bateria: ${soma(de('bateria'))}`;
       $('#cAvulsos').textContent = soma(av);
       $('#cAvulsosDet').textContent = `${av.length} pedido(s) • ${soma(av.filter((r) => r.status === 'pago'))} pagos`;
       $('#cInscricoes').textContent = inscricoes.length;
@@ -418,9 +448,10 @@
     const COLUNAS = {
       paisFilhos: ['Data', 'Responsável', 'WhatsApp', 'Abadá resp.', 'Crianças (nome • idade • abadá)', 'Abadás', 'Kit', 'Pagamento', ''],
       bandeiras:  ['Data', 'Nome', 'WhatsApp', 'Abadá', 'Abadás', 'Kit', 'Pagamento', ''],
+      caminhoAguas: ['Data', 'Tamanhos', 'Total de abadás', 'Observação', 'Pagamento', ''],
       destaque:   ['Data', 'Nome', 'Posição de destaque', 'WhatsApp', 'Abadá', 'Kit', 'Pagamento', ''],
       bateria:    ['Data', 'Nome', 'Instrumento', 'WhatsApp', 'Abadá', 'Kit', 'Pagamento', ''],
-      abada:      ['Data', 'Nome', 'WhatsApp', 'Tamanho', 'Quantidade', 'Valor', 'Pagamento', '']
+      abada:      ['Data', 'Nome', 'WhatsApp', 'Tamanhos', 'Quantidade', 'Valor', 'Pagamento', '']
     };
 
     function filtrados() {
@@ -473,12 +504,19 @@
           base = [dataCel, td(celulaNome(r)), td(celulaWhats(r)), td(tam(r.tamanho)), td(kids ? `<ul class="space-y-1.5 min-w-[280px]">${kids}</ul>` : '<span class="text-tinta/50 italic">Sem crianças (adulto)</span>'), td(`<span class="titulo text-lg">${qtd(r)}</span>`), td(kit(r))];
         } else if (abaAtual === 'bandeiras') {
           base = [dataCel, td(celulaNome(r)), td(celulaWhats(r)), td(tam(r.tamanho)), td(`<span class="titulo text-lg">${qtd(r)}</span>`), td(kit(r))];
+        } else if (abaAtual === 'caminhoAguas') {
+          const chips = resumoTamanhos(r).map(({ t, n }) => `<span class="inline-flex items-center gap-1 whitespace-nowrap"><span class="font-bold bg-pele rounded-md px-1.5 py-0.5">${esc(t)}</span><span class="text-tinta/60">× ${n}</span></span>`).join('');
+          base = [dataCel, td(`<div class="flex flex-wrap gap-x-3 gap-y-1.5 min-w-[200px]">${chips}</div>`), td(`<span class="titulo text-lg">${qtd(r)}</span>`),
+            td(r.obs ? `<span class="text-xs text-tinta/70">${esc(r.obs)}</span>` : '<span class="text-tinta/40">—</span>')];
         } else if (abaAtual === 'destaque') {
           base = [dataCel, td(celulaNome(r)), destaqueCel(r.posicao), td(celulaWhats(r)), td(tam(r.tamanho)), td(kit(r))];
         } else if (abaAtual === 'bateria') {
           base = [dataCel, td(celulaNome(r)), destaqueCel(r.instrumento), td(celulaWhats(r)), td(tam(r.tamanho)), td(kit(r))];
         } else {
-          base = [dataCel, td(celulaNome(r)), td(celulaWhats(r)), td(tam(r.tamanho)), td(`<span class="titulo text-lg">${qtd(r)}</span>`), td(kit(r))];
+          const tams = qtd(r) > 1
+            ? `<div class="flex flex-wrap gap-x-3 gap-y-1.5 min-w-[140px]">${resumoTamanhos(r).map(({ t, n }) => `<span class="whitespace-nowrap">${tam(t === 'sem tamanho' ? '' : t)} <span class="text-tinta/60">× ${n}</span></span>`).join('')}</div>`
+            : tam(r.tamanho);
+          base = [dataCel, td(celulaNome(r)), td(celulaWhats(r)), td(tams), td(`<span class="titulo text-lg">${qtd(r)}</span>`), td(kit(r))];
         }
         base.push(td(celulaStatus(r)), td(celulaAcoes(r), 'text-right'));
         return `<tr>${base.join('')}</tr>`;
@@ -556,8 +594,16 @@
         return [cab, ...linhas];
       }
       if (tipo === 'abada') {
-        return [['Data', 'Nome', 'WhatsApp', 'Tamanho', 'Quantidade', 'Valor', 'Pagamento', 'Origem', 'Observação'],
-          ...lista.map((r) => [dataCompleta(r.criadoEm), r.nome, r.whatsapp, r.tamanho, qtd(r), r.valorKit || '', statusTxt(r), origemTxt(r), r.obs || ''])];
+        return [['Data', 'Nome', 'WhatsApp', 'Tamanhos', 'Quantidade', 'Valor', 'Pagamento', 'Origem', 'Observação'],
+          ...lista.map((r) => [dataCompleta(r.criadoEm), r.nome, r.whatsapp, qtd(r) > 1 ? resumoTxt(r) : r.tamanho, qtd(r), r.valorKit || '', statusTxt(r), origemTxt(r), r.obs || ''])];
+      }
+      if (tipo === 'caminhoAguas') {
+        const linhas = [];
+        lista.forEach((r) => resumoTamanhos(r).forEach(({ t, n }, i) => linhas.push([
+          i === 0 ? dataCompleta(r.criadoEm) : '', t, n, i === 0 ? qtd(r) : '', statusTxt(r), i === 0 ? r.obs || '' : ''
+        ])));
+        return [['Data', 'Tamanho', 'Quantidade', 'Total do cadastro', 'Pagamento', 'Observação'], ...linhas,
+          [], ['TOTAL DA ALA', '', soma(lista)]];
       }
       const extra = tipo === 'destaque' ? 'Posição de destaque' : tipo === 'bateria' ? 'Instrumento' : null;
       return [['Data', 'Nome', ...(extra ? [extra] : []), 'WhatsApp', 'Abadá', 'Valor do kit', 'Pagamento', 'Origem', 'Observação'],
@@ -609,7 +655,7 @@
       const nome = `mosquito-2027-geral-${hoje()}`;
       if (!window.XLSX) {
         const tudo = [['Setor', 'Data', 'Nome', 'Posição / Instrumento', 'WhatsApp', 'Tamanho', 'Abadás', 'Crianças', 'Valor do kit', 'Pagamento', 'Origem', 'Observação']];
-        inscricoes.slice().reverse().forEach((r) => tudo.push([NOMES[r.tipo], dataCompleta(r.criadoEm), r.nome, r.posicao || r.instrumento || '', r.whatsapp, r.tamanho, qtd(r),
+        inscricoes.slice().reverse().forEach((r) => tudo.push([NOMES[r.tipo], dataCompleta(r.criadoEm), r.nome, r.posicao || r.instrumento || '', r.whatsapp, qtd(r) > 1 && r.tipo !== 'paisFilhos' ? resumoTxt(r) : r.tamanho, qtd(r),
           (r.criancas || []).map((c) => `${c.nome} (${c.idade} anos, ${c.tamanho || '—'})`).join(' | '), r.valorKit || '', statusTxt(r), origemTxt(r), r.obs || '']));
         return baixarCsv(tudo, nome);
       }
@@ -633,13 +679,69 @@
     function ajustarCamposSetor() {
       const t = $('#fTipo').value;
       document.querySelectorAll('#formCadastro [data-so]').forEach((el) => el.classList.toggle('hidden', el.dataset.so !== t));
-      document.querySelectorAll('#formCadastro [data-nao]').forEach((el) => el.classList.toggle('hidden', el.dataset.nao === t));
+      document.querySelectorAll('#formCadastro [data-nao]').forEach((el) => el.classList.toggle('hidden', el.dataset.nao.split(' ').includes(t)));
       $('#rotuloNome').textContent = t === 'paisFilhos' ? 'Nome do responsável' : 'Nome completo';
       $('#rotuloTamanho').textContent = t === 'paisFilhos' ? 'Abadá do responsável' : 'Tamanho do abadá';
       $('#rotuloValor').textContent = t === 'abada' ? 'Valor (total do pedido)' : 'Valor do kit';
       if (t === 'abada' && !editandoId && !$('#fValor').value) sugerirValorAvulso();
       if (t === 'paisFilhos' && !$('#fCriancas').children.length) linhaCrianca();
+      if (t === 'caminhoAguas' && !$('#fGrade').children.length) linhaGrade();
+      renderizarTamanhosExtra();
     }
+
+    // ---------- Abadá avulso: tamanho de cada abadá (quantidade > 1) ----------
+    // O seletor "Tamanho do abadá" vale para o abadá 1; os demais aparecem aqui.
+    function renderizarTamanhosExtra(valores) {
+      const t = $('#fTipo').value;
+      const q = t === 'abada' ? Math.min(Math.max(parseInt($('#fQtd').value, 10) || 1, 1), 200) : 1;
+      const caixa = $('#fTamanhosExtra');
+      if (valores) caixa.innerHTML = '';
+      const itens = caixa.children;
+      for (let i = itens.length + 2; i <= q; i++) {
+        const anterior = valores ? (valores[i - 1] || '') : (itens.length ? itens[itens.length - 1].querySelector('select').value : $('#fTamanho').value);
+        const div = document.createElement('div');
+        div.innerHTML = `<label class="block text-[11px] font-semibold text-tinta/70 mb-0.5">Abadá ${i}</label>
+          <select class="campo !py-1.5 !px-2 f-tam-extra">${opcoes(TAMANHOS, '—')}</select>`;
+        div.querySelector('select').value = anterior;
+        caixa.appendChild(div);
+      }
+      for (let i = itens.length - 1; i >= Math.max(q - 1, 0); i--) itens[i].remove();
+      $('#boxTamanhosExtra').classList.toggle('hidden', q <= 1);
+      if (t !== 'paisFilhos') $('#rotuloTamanho').textContent = q > 1 ? 'Tamanho do abadá 1' : 'Tamanho do abadá';
+      atualizarResumoTamanhos();
+    }
+    function tamanhosDoForm() {
+      return [$('#fTamanho').value, ...[...document.querySelectorAll('#fTamanhosExtra .f-tam-extra')].map((s) => s.value)];
+    }
+    function atualizarResumoTamanhos() {
+      const cont = {};
+      tamanhosDoForm().forEach((t) => { const k = t || 'sem tamanho'; cont[k] = (cont[k] || 0) + 1; });
+      $('#resumoTamanhos').textContent = Object.entries(cont).map(([t, n]) => `${n}× ${t}`).join(' • ');
+    }
+    $('#fTamanhosExtra').addEventListener('change', atualizarResumoTamanhos);
+    $('#fTamanho').addEventListener('change', atualizarResumoTamanhos);
+
+    // ---------- Ala Caminho das Águas: grade tamanho × quantidade ----------
+    function linhaGrade(g = {}) {
+      const div = document.createElement('div');
+      div.className = 'linha-grade grid grid-cols-[1fr_110px_32px] gap-2 items-center';
+      div.innerHTML = `
+        <select class="campo !py-2 g-tam">${opcoes(TAMANHOS, 'Tamanho')}</select>
+        <input class="campo !py-2 !px-2 g-qtd" type="number" min="1" max="500" placeholder="Qtd." value="${esc(g.quantidade ?? '')}" />
+        <button type="button" class="text-xl text-tinta/40 hover:text-red-700" aria-label="Remover tamanho">×</button>`;
+      div.querySelector('.g-tam').value = g.tamanho || '';
+      div.querySelector('.g-qtd').addEventListener('input', atualizarTotalGrade);
+      div.querySelector('button').addEventListener('click', () => { div.remove(); atualizarTotalGrade(); });
+      $('#fGrade').appendChild(div);
+      atualizarTotalGrade();
+    }
+    function gradeDoForm() {
+      return [...document.querySelectorAll('#fGrade .linha-grade')].map((l) => ({
+        tamanho: l.querySelector('.g-tam').value, quantidade: parseInt(l.querySelector('.g-qtd').value, 10) || 0
+      })).filter((g) => g.quantidade > 0);
+    }
+    function atualizarTotalGrade() { $('#totalGrade').textContent = gradeDoForm().reduce((s, g) => s + g.quantidade, 0); }
+    $('#btnAddGrade').addEventListener('click', () => linhaGrade());
     $('#fTipo').addEventListener('change', ajustarCamposSetor);
 
     // Abadá da criança: Infantil 1 a 16 (+ adulto para crianças maiores)
@@ -658,7 +760,10 @@
       const q = parseInt($('#fQtd').value, 10) || 1;
       $('#fValor').value = (unit * q).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
-    $('#fQtd').addEventListener('input', () => { if ($('#fTipo').value === 'abada' && !editandoId) sugerirValorAvulso(); });
+    $('#fQtd').addEventListener('input', () => {
+      if ($('#fTipo').value === 'abada' && !editandoId) sugerirValorAvulso();
+      renderizarTamanhosExtra();
+    });
     $('#fValor').addEventListener('input', () => { valorAvulsoManual = true; });
 
     function linhaCrianca(c = {}) {
@@ -709,6 +814,16 @@
       escolherOuOutro($('#fInstrumento'), $('#fInstrumentoOutro'), reg?.instrumento, INSTRUMENTOS);
       $('#fCriancas').innerHTML = '';
       (reg?.criancas || []).forEach((c) => linhaCrianca(c));
+      $('#fGrade').innerHTML = '';
+      (reg?.grade || []).forEach((g) => linhaGrade(g));
+      atualizarTotalGrade();
+      $('#fTamanhosExtra').innerHTML = '';
+      $('#fTipo').value = reg ? reg.tipo : abaAtual;
+      if (reg?.tipo === 'abada') {
+        const lista = reg.tamanhos?.length ? reg.tamanhos : Array(reg.quantidade || 1).fill(reg.tamanho || '');
+        $('#fTamanho').value = lista[0] || '';
+        renderizarTamanhosExtra(lista);
+      }
       ajustarCamposSetor();
       $('#modal').classList.remove('hidden');
       document.body.style.overflow = 'hidden';
@@ -743,13 +858,22 @@
       };
       if (t === 'destaque') dados.posicao = valorOuOutro($('#fPosicao'), $('#fPosicaoOutra'));
       if (t === 'bateria') dados.instrumento = valorOuOutro($('#fInstrumento'), $('#fInstrumentoOutro'));
+      if (t === 'abada') dados.tamanhos = tamanhosDoForm().slice(0, dados.quantidade);
+      if (t === 'caminhoAguas') {
+        dados.grade = gradeDoForm();
+        dados.nome = '';
+        dados.whatsapp = '';
+      }
       if (t === 'paisFilhos') {
         dados.criancas = [...document.querySelectorAll('#fCriancas .linha-crianca')].map((l) => ({
           nome: l.querySelector('.c-nome').value.trim(), idade: l.querySelector('.c-idade').value, tamanho: l.querySelector('.c-tam').value
         })).filter((c) => c.nome);
       }
 
-      if (dados.nome.length < 3) return falha('Informe o nome completo.');
+      if (t === 'caminhoAguas') {
+        if (!dados.grade.length) return falha('Informe ao menos um tamanho com quantidade.');
+        if (dados.grade.some((g) => !g.tamanho)) return falha('Escolha o tamanho em todas as linhas.');
+      } else if (dados.nome.length < 3) return falha('Informe o nome completo.');
       const dig = dados.whatsapp.replace(/\D/g, '').length;
       if (dig && (dig < 10 || dig > 11)) return falha('WhatsApp inválido: use DDD + número (ou deixe em branco).');
       if (t === 'destaque' && (dados.posicao || '').length < 2) return falha('Escolha a posição de destaque.');
