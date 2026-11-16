@@ -262,9 +262,9 @@
   </div>
 
   <script>
-    const TAMANHOS = ['PP', 'P', 'M', 'G', 'GG', 'XGG', 'G1', 'G2', 'Infantil'];
+    const TAMANHOS = ['PP', 'P', 'M', 'G', 'GG', 'XGG', 'G1', 'G2', 'G3', 'Infantil'];
     /* Abadá infantil das crianças (Ala Pais e Filhos): numeração de 1 a 16 */
-    const TAMANHOS_ADULTO = ['PP', 'P', 'M', 'G', 'GG', 'XGG', 'G1', 'G2'];
+    const TAMANHOS_ADULTO = ['PP', 'P', 'M', 'G', 'GG', 'XGG', 'G1', 'G2', 'G3'];
     const TAMANHOS_INFANTIS = Array.from({ length: 16 }, (_, i) => 'Infantil ' + (i + 1));
     /* Valor unitário do abadá avulso (mesmo do index.html) — usado para sugerir o valor no cadastro */
     const VALOR_AVULSO = 'R$ 54,90';
@@ -406,7 +406,7 @@
       if (cont.Infantil) adultos.push(caixa('Infantil (s/ nº)', cont.Infantil)); // cadastros antigos
       const totalInf = TAMANHOS_INFANTIS.reduce((s, t) => s + cont[t], 0);
       $('#porTamanho').innerHTML = `
-        <div class="col-span-full grid grid-cols-4 sm:grid-cols-8 gap-3">${adultos.join('')}</div>
+        <div class="col-span-full grid grid-cols-3 sm:grid-cols-9 gap-3">${adultos.join('')}</div>
         <p class="col-span-full text-xs font-bold uppercase tracking-wider text-laranja mt-2">Abadá Infantil (nº 1 a 16) • ${totalInf} no total</p>
         <div class="col-span-full grid grid-cols-4 sm:grid-cols-8 gap-3">${TAMANHOS_INFANTIS.map((t) => caixa(t.replace('Infantil ', 'Nº '), cont[t])).join('')}</div>`;
 
