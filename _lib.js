@@ -17,6 +17,8 @@ export const TAMANHOS_INFANTIS = Array.from({ length: 16 }, (_, i) => 'Infantil 
 export const TAMANHOS_CRIANCA = [...TAMANHOS, ...TAMANHOS_INFANTIS];
 // Setores que o SITE pode enviar
 export const TIPOS_PUBLICOS = ['paisFilhos', 'bandeiras', 'abada'];
+// Alas esgotadas: o site não aceita mais inscrições nelas (o painel ainda pode cadastrar)
+export const ALAS_ESGOTADAS = ['paisFilhos'];
 // Todos os setores (o painel pode cadastrar em qualquer um)
 // caminhoAguas = 3ª ala, patrocinada pela Pousada Caminho das Águas (só o painel cadastra)
 export const TIPOS = ['paisFilhos', 'bandeiras', 'caminhoAguas', 'destaque', 'bateria', 'abada'];
@@ -120,6 +122,7 @@ export function normalizar(b, { admin = false } = {}) {
   const falha = (m) => { throw new Error('INVALIDO: ' + m); };
   const permitidos = admin ? TIPOS : TIPOS_PUBLICOS;
   const tipo = permitidos.includes(b.tipo) ? b.tipo : falha('Setor inválido.');
+  if (!admin && ALAS_ESGOTADAS.includes(tipo)) falha('Esta ala está esgotada.');
 
   // Ala patrocinada: o cadastro é só tamanho + quantidade (nome é opcional)
   const nome = texto(b.nome, 100) || (tipo === 'caminhoAguas' ? NOME_CAMINHO_AGUAS : '');

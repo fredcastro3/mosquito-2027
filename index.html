@@ -271,6 +271,7 @@
             <img src="img/ala-pais-e-filhos.jpg?v=2" width="1600" height="1000" alt="Ala Pais e Filhos – Família Cigana"
                  class="w-full aspect-[16/10] object-cover" loading="lazy" />
             <span class="absolute top-4 left-4 bg-laranja text-white text-xs font-bold px-3 py-1.5 rounded-full border-2 border-tinta">Primeira Ala</span>
+            <span class="absolute top-4 right-4 bg-[#C62D12] text-white text-sm font-extrabold tracking-widest px-4 py-1.5 rounded-full border-2 border-tinta shadow-[2px_2px_0_#2B1610] rotate-3">ESGOTADA</span>
           </div>
           <div class="p-6 sm:p-8 flex-1 flex flex-col">
             <h3 class="titulo-preto text-4xl">Ala Pais e Filhos</h3>
@@ -303,7 +304,15 @@
               <p class="titulo-preto !text-laranja text-4xl sm:text-5xl whitespace-nowrap" data-valor="paisFilhosDesconto">R$ 0,00</p>
             </div>
 
-            <form id="formPaisFilhos" class="mt-6 space-y-4 flex-1 flex flex-col" novalidate>
+            <!-- ALA ESGOTADA: para reabrir, remova este aviso, o atributo data-esgotada do form,
+                 o "disabled" do fieldset e tire 'paisFilhos' de ALAS_ESGOTADAS em api/_lib.js -->
+            <div class="mt-6 rounded-2xl border-2 border-tinta bg-[#C62D12] text-white px-5 py-4 text-center shadow-[3px_3px_0_#2B1610]" role="status">
+              <p class="titulo-preto !text-white text-3xl tracking-widest">ESGOTADA</p>
+              <p class="mt-1 text-sm font-semibold text-white/90">Todas as vagas da Ala Pais e Filhos foram preenchidas. Obrigado pelo carinho! Confira as outras alas.</p>
+            </div>
+
+            <form id="formPaisFilhos" class="mt-6 flex-1 flex flex-col" data-esgotada="true" novalidate aria-disabled="true">
+             <fieldset disabled class="space-y-4 flex-1 flex flex-col opacity-50 pointer-events-none select-none">
               <input type="text" name="mq_confirma_hp" class="armadilha" tabindex="-1" autocomplete="new-password" data-lpignore="true" data-1p-ignore aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" />
               <div>
                 <label for="pfNome" class="block text-sm font-semibold mb-1.5">Nome do responsável</label>
@@ -332,10 +341,11 @@
               <div id="listaCriancas" class="space-y-3"></div>
 
               <div class="pt-3 mt-auto">
-                <button type="submit" class="btn-enviar btn-laranja w-full font-bold px-6 py-4 rounded-2xl flex items-center justify-center gap-2">
-                  Inscrever na Ala Pais e Filhos
+                <button type="submit" disabled class="btn-enviar btn-laranja w-full font-bold px-6 py-4 rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed">
+                  Ala esgotada
                 </button>
               </div>
+             </fieldset>
             </form>
           </div>
         </div>
@@ -850,6 +860,7 @@
     $('#formPaisFilhos').addEventListener('submit', (e) => {
       e.preventDefault();
       const form = e.currentTarget;
+      if (form.dataset.esgotada === 'true') return; // ala esgotada: não envia
       const nome = $('#pfNome'), tel = $('#pfTelefone'), tam = $('#pfTamanho');
       // Campo vazio = 0 crianças (adulto inscrito sem crianças sob responsabilidade)
       if (inputQtd.value.trim() === '') { inputQtd.value = '0'; renderizarCriancas(); }
