@@ -60,3 +60,14 @@ OBSERVAÇÕES
   • Valores dos kits: no final do index.html (constante VALORES_KIT).
   • O arquivo de pré-visualização (mosquito-preview.html) NÃO salva no
     sistema: só o site publicado no Vercel salva.
+
+
+ALA ESGOTADA (Ala Pais e Filhos — esgotou em 2027)
+  • No index.html, o card da ala tem o atributo data-esgotada: ele mostra só o
+    aviso ESGOTADA e esconde o preço e o formulário (que continuam no código).
+  • Na API, api/_lib.js tem ALAS_ESGOTADAS = ['paisFilhos']: o site não aceita
+    inscrição nessa ala; o painel continua podendo cadastrar manualmente.
+  • PARA REABRIR (ex.: Carnaval 2028): apague data-esgotada do card no
+    index.html E tire 'paisFilhos' de ALAS_ESGOTADAS em api/_lib.js (e _lib.js).
+  • Para esgotar outra ala: faça o mesmo ao contrário (data-esgotada no card +
+    nome do setor em ALAS_ESGOTADAS) e adicione as classes so-esgotada/so-aberta.
